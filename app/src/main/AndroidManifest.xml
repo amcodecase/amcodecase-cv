@@ -24,5 +24,7 @@
             </intent-filter>
         </activity>
     </application>
-
+    <queries>
+        <package android:name="com.airtel.africa.selfcare" />
+    </queries>
 </manifest>

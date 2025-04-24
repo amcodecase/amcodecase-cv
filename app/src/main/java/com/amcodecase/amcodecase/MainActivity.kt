@@ -12,6 +12,14 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.unit.dp
 import android.content.Intent
 import android.net.Uri
+import android.content.Context
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
+import android.content.pm.PackageManager
+import android.widget.Toast
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.material.icons.outlined.WorkspacePremium
 //import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -37,6 +45,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
@@ -73,6 +83,12 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.AlertDialog
+import androidx.compose.material.Text
+import androidx.compose.material.Button
+import androidx.compose.material.Dialog
+import androidx.compose.material.AlertDialogBuilder
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -310,6 +326,52 @@ fun ProfileHeader(
     textColor: Color,
     isDarkTheme: Boolean
 ) {
+    // For the triple-tap detection
+    var tapCount by remember { mutableStateOf(0) }
+    var lastTapTime by remember { mutableStateOf(0L) }
+    val context = LocalContext.current
+
+    // State for showing the alert dialog
+    var showCoffeeDialog by remember { mutableStateOf(false) }
+
+    // Reset tap count after delay
+    LaunchedEffect(tapCount) {
+        if (tapCount > 0) {
+            delay(500) // Reset after 500ms if no more taps
+            tapCount = 0
+        }
+    }
+
+    // Coffee confirmation dialog
+    if (showCoffeeDialog) {
+        AlertDialog(
+            onDismissRequest = { showCoffeeDialog = false },
+            title = { Text("Coffee Time!") },
+            text = { Text("You have promised to buy me coffee... you know what to do!") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showCoffeeDialog = false
+                        // Launch Airtel Money after confirmation
+                        launchAirtelMoney(context)
+                    }
+                ) {
+                    Text("Let's do it!")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showCoffeeDialog = false }
+                ) {
+                    Text("Maybe later")
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.primary,
+            textContentColor = MaterialTheme.colorScheme.onSurface
+        )
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -375,13 +437,32 @@ fun ProfileHeader(
         ) {
             Spacer(modifier = Modifier.height(24.dp)) // This will push everything below it
 
+            // Profile image with triple tap detection
             Box(
                 modifier = Modifier
                     .size(120.dp)
                     .shadow(8.dp, CircleShape)
                     .clip(CircleShape)
                     .background(Color.White)
-                    .padding(1.dp),
+                    .padding(1.dp)
+                    .clickable {
+                        val currentTime = System.currentTimeMillis()
+                        if (currentTime - lastTapTime < 500) {
+                            tapCount++
+
+                            // Check for triple tap
+                            if (tapCount == 3) {
+                                // Show the coffee dialog instead of launching directly
+                                showCoffeeDialog = true
+                                // Reset after successful trigger
+                                tapCount = 0
+                            }
+                        } else {
+                            // First tap or tap after timeout
+                            tapCount = 1
+                        }
+                        lastTapTime = currentTime
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 Box(
@@ -465,9 +546,91 @@ fun ProfileHeader(
                     )
                 }
             }
-            }
         }
     }
+}
+
+// Function to launch Airtel Money or show fallback
+fun launchAirtelMoney(context: Context) {
+    val airtelPackage = "com.airtel.africa.selfcare"
+    val isAirtelInstalled = try {
+        context.packageManager.getPackageInfo(airtelPackage, 0)
+        true
+    } catch (e: PackageManager.NameNotFoundException) {
+        false
+    }
+
+    if (isAirtelInstalled) {
+        // Launch Airtel Money app
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(airtelPackage)
+        if (launchIntent != null) {
+            context.startActivity(launchIntent)
+        }
+    } else {
+        // Show fallback message
+        Toast.makeText(
+            context,
+            "Airtel Money app not installed. You can still buy me a coffee via USSD.",
+            Toast.LENGTH_LONG
+        ).show()
+
+        // Optional: Launch USSD code
+        try {
+            val ussdCode = "*115#"
+            val ussdIntent = Intent(Intent.ACTION_CALL)
+            ussdIntent.data = Uri.parse("tel:$ussdCode")
+            context.startActivity(ussdIntent)
+        } catch (e: Exception) {
+            // Handle exceptions (like missing CALL permission)
+            Toast.makeText(
+                context,
+                "Couldn't launch USSD code. Please dial *115# manually.",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+}
+// Function to launch Airtel Money or show fallback
+fun launchAirtelMoney(context: Context) {
+    val airtelPackage = "com.airtel.africa.selfcare"
+    val isAirtelInstalled = try {
+        context.packageManager.getPackageInfo(airtelPackage, 0)
+        true
+    } catch (e: PackageManager.NameNotFoundException) {
+        false
+    }
+
+    if (isAirtelInstalled) {
+        // Launch Airtel Money app
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(airtelPackage)
+        if (launchIntent != null) {
+            context.startActivity(launchIntent)
+        }
+    } else {
+        // Show fallback message
+        Toast.makeText(
+            context,
+            "Airtel Money app not installed. You can still buy me a coffee via USSD.",
+            Toast.LENGTH_LONG
+        ).show()
+
+        // Optional: Launch USSD code
+        try {
+            val ussdCode = "*115#"
+            val ussdIntent = Intent(Intent.ACTION_CALL)
+            ussdIntent.data = Uri.parse("tel:$ussdCode")
+            context.startActivity(ussdIntent)
+        } catch (e: Exception) {
+            // Handle exceptions (like missing CALL permission)
+            Toast.makeText(
+                context,
+                "Couldn't launch USSD code. Please dial *115# manually.",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+}
+
 @Composable
 fun TechIconsBackground() {
     // Define the tech icons
@@ -540,12 +703,24 @@ fun ProfileContent(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        // Tech expertise section
-        TechExpertiseSection(
-            primaryColor = primaryColor,
+
+        // About me section
+        AboutMeCard(
             surfaceColor = surfaceColor,
             textPrimaryColor = textPrimaryColor,
-            textSecondaryColor = textSecondaryColor
+            textSecondaryColor = textSecondaryColor,
+            isDarkTheme = isDarkTheme
+        )
+
+        // Tech expertise section
+        SkillDistributionSection(
+            primaryColor = primaryColor,
+            secondaryColor = secondaryColor,
+            accentColor = accentColor,
+            surfaceColor = surfaceColor,
+            textPrimaryColor = textPrimaryColor,
+            textSecondaryColor = textSecondaryColor,
+            isDarkTheme = isDarkTheme
         )
 
         // Personal info card
@@ -554,14 +729,6 @@ fun ProfileContent(
             surfaceColor = surfaceColor,
             textPrimaryColor = textPrimaryColor,
             textSecondaryColor = textSecondaryColor
-        )
-
-        // About me section
-        AboutMeCard(
-            surfaceColor = surfaceColor,
-            textPrimaryColor = textPrimaryColor,
-            textSecondaryColor = textSecondaryColor,
-            isDarkTheme = isDarkTheme
         )
 
         // Stats section
@@ -579,17 +746,78 @@ fun ProfileContent(
 }
 
 @Composable
-fun TechExpertiseSection(
-    primaryColor: Color,
+fun AboutMeCard(
     surfaceColor: Color,
     textPrimaryColor: Color,
-    textSecondaryColor: Color
+    textSecondaryColor: Color,
+    isDarkTheme: Boolean
 ) {
-    // Static progress values
-    val progress1 = 0.6f
-    val progress2 = 0.55f
-    val progress3 = 0.555f
-    val progress4 = 0.80f
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = surfaceColor)
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = "About Me",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = textPrimaryColor,
+                letterSpacing = 1.sp
+            )
+
+            Divider(color = textSecondaryColor.copy(alpha = 0.2f), thickness = 1.dp)
+
+            Text(
+                text = "I am a software developer with hands-on experience across web and mobile applications, networking, embedded systems, and cybersecurity. My focus is on building clean, efficient, and sustainable systems.",
+                style = MaterialTheme.typography.bodyMedium,
+                lineHeight = 24.sp,
+                color = textPrimaryColor,
+                textAlign = TextAlign.Justify
+            )
+
+            Text(
+                text = "I am deeply committed to structure, user experience, and solving real-world problems, particularly in the fields of education and tech accessibility. My experience spans software development, networking, and low-level hardware integration.",
+                style = MaterialTheme.typography.bodyMedium,
+                lineHeight = 24.sp,
+                color = textPrimaryColor,
+                textAlign = TextAlign.Justify
+            )
+
+            Text(
+                text = "Beyond development, I am passionate about ethical hacking, digital forensics like data recovery, and empowering others in the tech community whether students, fellow developers, or aspiring engineers. I learn quickly, build purposefully, and continuously strive for progress.",
+                style = MaterialTheme.typography.bodyMedium,
+                lineHeight = 24.sp,
+                color = textPrimaryColor,
+                textAlign = TextAlign.Justify
+            )
+        }
+    }
+}
+
+
+@Composable
+fun SkillDistributionSection(
+    primaryColor: Color,
+    secondaryColor: Color,
+    accentColor: Color,
+    surfaceColor: Color,
+    textPrimaryColor: Color,
+    textSecondaryColor: Color,
+    isDarkTheme: Boolean
+) {
+    // Updated skill distribution values based on percentage
+    val softwareDev = 0.35f
+    val cybersecurity = 0.20f
+    val embeddedSystems = 0.15f
+    val tutoring = 0.10f
+    val networking = 0.08f
+    val generalSkills = 0.07f
+    val other = 0.05f
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -601,49 +829,188 @@ fun TechExpertiseSection(
             modifier = Modifier.padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Psychology,
+                        contentDescription = null,
+                        tint = primaryColor,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "SKILLSET DISTRIBUTION",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = primaryColor,
+                        letterSpacing = 1.sp
+                    )
+                }
+                Text(
+                    text = "100%",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = accentColor
+                )
+            }
+
             Text(
-                text = "TECH EXPERTISE",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = primaryColor,
-                letterSpacing = 1.sp
+                text = "What you're looking at:",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = textPrimaryColor
             )
 
-            TechExpertiseItem(
+            Text(
+                text = "This is not simply a display of skills, it is a structured representation of how my expertise is distributed. " +
+                        "Each area reflects a deliberate focus, illustrating where I invest my time, effort, and mastery. " +
+                        "Together, these areas form a complete picture of my professional capacity, my full 100%.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = textSecondaryColor,
+                textAlign = TextAlign.Justify
+            )
+
+            // Advanced skill meter with animated colors and percentage indicators
+            SkillMeterItem(
                 icon = Icons.Outlined.DeveloperBoard,
                 title = "Software Development",
-                progress = progress1,
-                primaryColor = primaryColor,
+                progress = softwareDev,
+                percentage = "35%",
+                color = primaryColor,
                 textColor = textPrimaryColor
             )
 
-            TechExpertiseItem(
+            SkillMeterItem(
                 icon = Icons.Default.Security,
-                title = "Cyber Security (Digital Forensics)",
-                progress = progress2,
-                primaryColor = primaryColor,
+                title = "Cybersecurity",
+                progress = cybersecurity,
+                percentage = "20%",
+                color = secondaryColor,
                 textColor = textPrimaryColor
             )
 
-            TechExpertiseItem(
+            SkillMeterItem(
                 icon = Icons.Outlined.Memory,
-                title = "Network Engineering",
-                progress = progress3,
-                primaryColor = primaryColor,
+                title = "Embedded Systems",
+                progress = embeddedSystems,
+                percentage = "15%",
+                color = accentColor,
                 textColor = textPrimaryColor
             )
 
-            TechExpertiseItem(
+            SkillMeterItem(
                 icon = Icons.Default.School,
-                title = "Teaching / Tutoring / Lecturing",
-                progress = progress4,
-                primaryColor = primaryColor,
+                title = "Educational Services (Teaching, etc.)",
+                progress = tutoring,
+                percentage = "10%",
+                color = Color(0xFF8BC34A),
+                textColor = textPrimaryColor
+            )
+
+            SkillMeterItem(
+                icon = Icons.Default.Router,
+                title = "Computer Networking",
+                progress = networking,
+                percentage = "8%",
+                color = Color(0xFFFF9800),
+                textColor = textPrimaryColor
+            )
+
+            SkillMeterItem(
+                icon = Icons.Default.Handyman,
+                title = "General Tech Skills",
+                progress = generalSkills,
+                percentage = "7%",
+                color = Color(0xFF9C27B0),
+                textColor = textPrimaryColor
+            )
+
+            SkillMeterItem(
+                icon = Icons.Default.Extension,
+                title = "Other",
+                progress = other,
+                percentage = "5%",
+                color = Color(0xFF607D8B),
                 textColor = textPrimaryColor
             )
         }
     }
 }
 
+@Composable
+fun SkillMeterItem(
+    icon: ImageVector,
+    title: String,
+    progress: Float,
+    percentage: String,
+    color: Color,
+    textColor: Color
+) {
+    val progressAnimation by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+        label = ""
+    )
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = textColor
+                )
+            }
+            Text(
+                text = percentage,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = color
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(color.copy(alpha = 0.15f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(progressAnimation)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(
+                                color.copy(alpha = 0.7f),
+                                color
+                            )
+                        )
+                    )
+            )
+        }
+    }
+}
 @Composable
 fun TechExpertiseItem(
     icon: ImageVector,
@@ -835,61 +1202,6 @@ fun InfoRow(
 }
 
 @Composable
-fun AboutMeCard(
-    surfaceColor: Color,
-    textPrimaryColor: Color,
-    textSecondaryColor: Color,
-    isDarkTheme: Boolean
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = surfaceColor)
-    ) {
-        Column(
-            modifier = Modifier.padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text(
-                text = "ABOUT ME",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = textPrimaryColor,
-                letterSpacing = 1.sp
-            )
-
-            Divider(color = textSecondaryColor.copy(alpha = 0.2f), thickness = 1.dp)
-
-            Text(
-                text = "I'm a software developer with hands-on experience across web & mobile apps, networks, embedded systems, and cybersecurity. I build systems that are clean, efficient, and built to last.",
-                style = MaterialTheme.typography.bodyMedium,
-                lineHeight = 24.sp,
-                color = textPrimaryColor,
-                textAlign = TextAlign.Justify
-            )
-
-
-            Text(
-                text = "I care about structure, user experience, and solving real-world problems — especially in education and access to tech. I’ve worked in setups that cut across software, networks, and low-level hardware integration.",
-                style = MaterialTheme.typography.bodyMedium,
-                lineHeight = 24.sp,
-                color = textPrimaryColor,
-                textAlign = TextAlign.Justify
-            )
-
-            Text(
-                text = "Outside development, I’m passionate about ethical hacking, digital forensics, and helping others grow in tech — whether it’s students, fellow devs, or future engineers. I learn fast, build with purpose, and always keep moving forward.",
-                style = MaterialTheme.typography.bodyMedium,
-                lineHeight = 24.sp,
-                color = textPrimaryColor,
-                textAlign = TextAlign.Justify
-            )
-        }
-    }
-}
-
-@Composable
 fun StatsSection(
     primaryColor: Color,
     secondaryColor: Color,
@@ -1064,7 +1376,7 @@ fun AwardsContent(
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
                 Text(
-                    text = "THINGS AM PROUD OF",
+                    text = "MY ACHIEVEMENTS",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = primaryColor,
@@ -1601,7 +1913,7 @@ fun SkillsContent(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        // Software Development Skills Section
+        // Software Development Services Section
         Card(
             modifier = Modifier.fillMaxWidth(),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
@@ -1610,7 +1922,7 @@ fun SkillsContent(
         ) {
             Column(
                 modifier = Modifier.padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -1624,62 +1936,61 @@ fun SkillsContent(
                     )
 
                     Text(
-                        text = "SOFTWARE DEVELOPMENT",
+                        text = "Development Services",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = primaryColor,
-                        letterSpacing = 1.sp
+                        color = primaryColor
                     )
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Software Development Skills
-                SkillItem(
-                    skill = "Object-Oriented Programming (PHP, Kotlin)",
-                    progress = 0.85f,
+                // Development Services as simple skill items with icons
+                SimpleSkillItem(
+                    skill = "Custom Website Development & CMS Integration",
+                    icon = Icons.Outlined.Language,
                     primaryColor = primaryColor,
                     textPrimaryColor = textPrimaryColor
                 )
 
-                SkillItem(
+                SimpleSkillItem(
+                    skill = "Web Application Development",
+                    icon = Icons.Outlined.Web,
+                    primaryColor = primaryColor,
+                    textPrimaryColor = textPrimaryColor
+                )
+
+                SimpleSkillItem(
                     skill = "Native Android Application Development",
-                    progress = 0.20f,
+                    icon = Icons.Outlined.PhoneAndroid,
                     primaryColor = primaryColor,
                     textPrimaryColor = textPrimaryColor
                 )
 
-                SkillItem(
-                    skill = "Relational Database Design and Query Optimization",
-                    progress = 0.75f,
+                SimpleSkillItem(
+                    skill = "Database Design & Optimization",
+                    icon = Icons.Outlined.Storage,
                     primaryColor = primaryColor,
                     textPrimaryColor = textPrimaryColor
                 )
 
-                SkillItem(
-                    skill = "RESTful API Integration",
-                    progress = 0.82f,
+                SimpleSkillItem(
+                    skill = "API Development & System Integration",
+                    icon = Icons.Outlined.Api,
                     primaryColor = primaryColor,
                     textPrimaryColor = textPrimaryColor
                 )
 
-                SkillItem(
-                    skill = "Version Control (Git, GitHub)",
-                    progress = 0.90f,
-                    primaryColor = primaryColor,
-                    textPrimaryColor = textPrimaryColor
-                )
-
-                SkillItem(
-                    skill = "Scripting & Automation (Python, Bash)",
-                    progress = 0.90f,
+                SimpleSkillItem(
+                    skill = "Custom Automation Solutions",
+                    icon = Icons.Outlined.AutoFixHigh,
                     primaryColor = primaryColor,
                     textPrimaryColor = textPrimaryColor
                 )
             }
         }
 
-        // Networking Skills Section
+        // IT Infrastructure Services Section
         Card(
             modifier = Modifier.fillMaxWidth(),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
@@ -1688,69 +1999,68 @@ fun SkillsContent(
         ) {
             Column(
                 modifier = Modifier.padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Wifi,
+                        imageVector = Icons.Default.Dns,
                         contentDescription = null,
                         tint = secondaryColor,
                         modifier = Modifier.size(28.dp)
                     )
 
                     Text(
-                        text = "NETWORKING",
+                        text = "IT Infrastructure Services",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = secondaryColor,
-                        letterSpacing = 1.sp
+                        color = secondaryColor
                     )
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Networking Skills
-                SkillItem(
-                    skill = "Network Infrastructure Configuration",
-                    progress = 0.70f,
+                // IT Infrastructure Services
+                SimpleSkillItem(
+                    skill = "Network Architecture & Implementation",
+                    icon = Icons.Outlined.SettingsEthernet,
                     primaryColor = secondaryColor,
                     textPrimaryColor = textPrimaryColor
                 )
 
-                SkillItem(
-                    skill = "IP Addressing and Subnetting",
-                    progress = 0.75f,
+                SimpleSkillItem(
+                    skill = "IT Security Assessments & Hardening",
+                    icon = Icons.Outlined.Shield,
                     primaryColor = secondaryColor,
                     textPrimaryColor = textPrimaryColor
                 )
 
-                SkillItem(
-                    skill = "Firewall and Access Control Implementation",
-                    progress = 0.68f,
+                SimpleSkillItem(
+                    skill = "Enterprise Firewall Configuration",
+                    icon = Icons.Outlined.Security,
                     primaryColor = secondaryColor,
                     textPrimaryColor = textPrimaryColor
                 )
 
-                SkillItem(
-                    skill = "VPN and Remote Access Management",
-                    progress = 0.65f,
+                SimpleSkillItem(
+                    skill = "VPN & Remote Access Solutions",
+                    icon = Icons.Outlined.VpnLock,
                     primaryColor = secondaryColor,
                     textPrimaryColor = textPrimaryColor
                 )
 
-                SkillItem(
-                    skill = "Network Monitoring",
-                    progress = 0.72f,
+                SimpleSkillItem(
+                    skill = "Network Monitoring & Management",
+                    icon = Icons.Outlined.MonitorHeart,
                     primaryColor = secondaryColor,
                     textPrimaryColor = textPrimaryColor
                 )
             }
         }
 
-        // Cybersecurity Skills Section
+        // Professional Services Section
         Card(
             modifier = Modifier.fillMaxWidth(),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
@@ -1759,69 +2069,68 @@ fun SkillsContent(
         ) {
             Column(
                 modifier = Modifier.padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Security,
+                        imageVector = Icons.Default.School,
                         contentDescription = null,
                         tint = accentColor,
                         modifier = Modifier.size(28.dp)
                     )
 
                     Text(
-                        text = "CYBERSECURITY",
+                        text = "Professional Services",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = accentColor,
-                        letterSpacing = 1.sp
+                        color = accentColor
                     )
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Cybersecurity Skills
-                SkillItem(
-                    skill = "Vulnerability Assessment and Management",
-                    progress = 0.75f,
+                // Professional Services
+                SimpleSkillItem(
+                    skill = "Technical Training & Master Classes",
+                    icon = Icons.Outlined.CastForEducation,
                     primaryColor = accentColor,
                     textPrimaryColor = textPrimaryColor
                 )
 
-                SkillItem(
-                    skill = "Digital Forensics",
-                    progress = 0.80f,
+                SimpleSkillItem(
+                    skill = "One-on-One Mentoring",
+                    icon = Icons.Outlined.PersonPin,
                     primaryColor = accentColor,
                     textPrimaryColor = textPrimaryColor
                 )
 
-                SkillItem(
-                    skill = "Secure System Configuration",
-                    progress = 0.72f,
+                SimpleSkillItem(
+                    skill = "Corporate Team Building",
+                    icon = Icons.Outlined.Groups,
                     primaryColor = accentColor,
                     textPrimaryColor = textPrimaryColor
                 )
 
-                SkillItem(
-                    skill = "Basic Web App Penetration Testing",
-                    progress = 0.65f,
+                SimpleSkillItem(
+                    skill = "Technical Consulting",
+                    icon = Icons.Outlined.AssignmentTurnedIn,
                     primaryColor = accentColor,
                     textPrimaryColor = textPrimaryColor
                 )
 
-                SkillItem(
-                    skill = "Basic Password Auditing and Data Recovery",
-                    progress = 0.78f,
+                SimpleSkillItem(
+                    skill = "Talent Development",
+                    icon = Icons.Outlined.Stars,
                     primaryColor = accentColor,
                     textPrimaryColor = textPrimaryColor
                 )
 
-                SkillItem(
-                    skill = "Secure Data Disposal and Media Sanitization",
-                    progress = 0.70f,
+                SimpleSkillItem(
+                    skill = "Digital Forensics (Data Recovery)",
+                    icon = Icons.Outlined.FindInPage,
                     primaryColor = accentColor,
                     textPrimaryColor = textPrimaryColor
                 )
@@ -1829,6 +2138,34 @@ fun SkillsContent(
         }
 
         Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+@Composable
+fun SimpleSkillItem(
+    skill: String,
+    icon: ImageVector,
+    primaryColor: Color,
+    textPrimaryColor: Color
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = primaryColor,
+            modifier = Modifier.size(20.dp)
+        )
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Text(
+            text = skill,
+            style = MaterialTheme.typography.bodyLarge,
+            color = textPrimaryColor
+        )
     }
 }
 
