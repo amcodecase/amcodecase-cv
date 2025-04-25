@@ -13,6 +13,13 @@ import androidx.compose.ui.unit.dp
 import android.content.Intent
 import android.net.Uri
 import android.content.Context
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.pager.HorizontalPager
+
 import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.delay
 import android.content.pm.PackageManager
@@ -84,11 +91,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.material.AlertDialog
-import androidx.compose.material.Text
-import androidx.compose.material.Button
-import androidx.compose.material.Dialog
-import androidx.compose.material.AlertDialogBuilder
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.Button
+//import androidx.compose.material.Dialog
+import androidx.compose.ui.window.Dialog
+//import androidx.compose.material.AlertDialogBuilder
+//import androidx.compose.ui.window.AlertDialogBuilder
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -161,7 +170,7 @@ fun TechProfileApp(
         modifier = Modifier.fillMaxSize(),
         containerColor = backgroundColor,
         floatingActionButton = {
-            ThemeSwitchFAB(isDarkTheme = isDarkTheme, onThemeToggle = onThemeToggle)
+//            ThemeSwitchFAB(isDarkTheme = isDarkTheme, onThemeToggle = onThemeToggle)
         }
     ) { innerPadding ->
         ProfileScreen(
@@ -178,25 +187,8 @@ fun TechProfileApp(
     }
 }
 
-@Composable
-fun ThemeSwitchFAB(
-    isDarkTheme: Boolean,
-    onThemeToggle: () -> Unit
-) {
-    FloatingActionButton(
-        onClick = onThemeToggle,
-        containerColor = if (isDarkTheme) Color(0xFF3A0CA3) else Color(0xFF4361EE),
-        contentColor = Color.White,
-        shape = CircleShape
-    ) {
-        Icon(
-            imageVector = if (isDarkTheme) Icons.Default.Brightness7 else Icons.Default.Brightness4,
-            contentDescription = if (isDarkTheme) "Switch to Light Theme" else "Switch to Dark Theme",
-            modifier = Modifier.size(24.dp)
-        )
-    }
-}
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ProfileScreen(
     modifier: Modifier = Modifier,
@@ -209,15 +201,27 @@ fun ProfileScreen(
     textSecondaryColor: Color,
     isDarkTheme: Boolean
 ) {
-    var selectedTabIndex by remember { mutableStateOf(0) }
-    val tabs = listOf(
-        TabItem("Profile", Icons.Default.Person),
-        TabItem("Skills", Icons.Default.Build),
-        TabItem("Career", Icons.Default.DateRange),
-        TabItem("Awards", Icons.Default.Star)
-    )
+    val tabs = remember {
+        listOf(
+            TabItem("Profile", Icons.Default.Person),
+            TabItem("Works", Icons.Default.Build),
+            TabItem("Career", Icons.Default.DateRange),
+            TabItem("Awards", Icons.Default.Star)
+        )
+    }
 
-    val scrollState = rememberScrollState()
+    // Use pagerState for swipe navigation
+    val pagerState = rememberPagerState { tabs.size }
+    val coroutineScope = rememberCoroutineScope()
+
+    // Store these calculated values to prevent recalculations during recomposition
+    val selectedContentColor = primaryColor
+    val unselectedContentColor = remember(textSecondaryColor) {
+        textSecondaryColor.copy(alpha = 0.7f)
+    }
+    val tabDividerColor = remember(primaryColor) {
+        primaryColor.copy(alpha = 0.1f)
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         // Header - NO PADDING applied here
@@ -232,16 +236,20 @@ fun ProfileScreen(
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             // Tabs with better styling and contrast
             TabRow(
-                selectedTabIndex = selectedTabIndex,
+                selectedTabIndex = pagerState.currentPage,
                 containerColor = surfaceColor,
                 contentColor = primaryColor,
-                divider = { Divider(thickness = 2.dp, color = primaryColor.copy(alpha = 0.1f)) },
+                divider = { Divider(thickness = 2.dp, color = tabDividerColor) },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 tabs.forEachIndexed { index, tab ->
                     Tab(
-                        selected = selectedTabIndex == index,
-                        onClick = { selectedTabIndex = index },
+                        selected = pagerState.currentPage == index,
+                        onClick = {
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(index)
+                            }
+                        },
                         icon = {
                             Icon(
                                 imageVector = tab.icon,
@@ -250,70 +258,73 @@ fun ProfileScreen(
                             )
                         },
                         text = {
+                            val fontWeight = if (pagerState.currentPage == index) FontWeight.SemiBold else FontWeight.Medium
                             Text(
                                 text = tab.title,
-                                fontWeight = if (selectedTabIndex == index) FontWeight.SemiBold else FontWeight.Medium,
+                                fontWeight = fontWeight,
                                 modifier = Modifier.padding(vertical = 8.dp)
                             )
                         },
-                        selectedContentColor = primaryColor,
-                        unselectedContentColor = textSecondaryColor.copy(alpha = 0.7f)
+                        selectedContentColor = selectedContentColor,
+                        unselectedContentColor = unselectedContentColor
                     )
                 }
             }
 
-            // Content area with proper scrolling
-            Box(
+            // Replace Box with HorizontalPager for swipe navigation
+            HorizontalPager(
+                state = pagerState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(scrollState)
-                    .padding(vertical = 16.dp)
-            ) {
-                when (selectedTabIndex) {
-                    0 -> ProfileContent(
-                        primaryColor = primaryColor,
-                        secondaryColor = secondaryColor,
-                        accentColor = accentColor,
-                        surfaceColor = surfaceColor,
-                        textPrimaryColor = textPrimaryColor,
-                        textSecondaryColor = textSecondaryColor,
-                        isDarkTheme = isDarkTheme
-                    )
-                    1 -> SkillsContent(
-                        primaryColor = primaryColor,
-                        secondaryColor = secondaryColor,
-                        accentColor = accentColor,
-                        surfaceColor = surfaceColor,
-                        textPrimaryColor = textPrimaryColor,
-                        textSecondaryColor = textSecondaryColor,
-                        isDarkTheme = isDarkTheme
-                    )
-                    2 -> CareerContent(
-                        primaryColor = primaryColor,
-                        secondaryColor = secondaryColor,
-                        accentColor = accentColor,
-                        surfaceColor = surfaceColor,
-                        textPrimaryColor = textPrimaryColor,
-                        textSecondaryColor = textSecondaryColor,
-                        isDarkTheme = isDarkTheme
-                    )
-                    3 -> AwardsContent(
-                        primaryColor = primaryColor,
-                        secondaryColor = secondaryColor,
-                        accentColor = accentColor,
-                        surfaceColor = surfaceColor,
-                        textPrimaryColor = textPrimaryColor,
-                        textSecondaryColor = textSecondaryColor,
-                        isDarkTheme = isDarkTheme
-                    )
-//                    else -> ComingSoonContent(
-//                        tabName = tabs[selectedTabIndex].title,
-//                        primaryColor = primaryColor,
-//                        accentColor = accentColor,
-//                        surfaceColor = surfaceColor,
-//                        textPrimaryColor = textPrimaryColor,
-//                        textSecondaryColor = textSecondaryColor
-//                    )
+                    .padding(vertical = 16.dp),
+                pageSpacing = 0.dp,
+                userScrollEnabled = true
+            ) { page ->
+                // Each page should have its own scroll state
+                val pageScrollState = rememberScrollState()
+
+                Box(modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(pageScrollState)
+                ) {
+                    when (page) {
+                        0 -> ProfileContent(
+                            primaryColor = primaryColor,
+                            secondaryColor = secondaryColor,
+                            accentColor = accentColor,
+                            surfaceColor = surfaceColor,
+                            textPrimaryColor = textPrimaryColor,
+                            textSecondaryColor = textSecondaryColor,
+                            isDarkTheme = isDarkTheme
+                        )
+                        1 -> SkillsContent(
+                            primaryColor = primaryColor,
+                            secondaryColor = secondaryColor,
+                            accentColor = accentColor,
+                            surfaceColor = surfaceColor,
+                            textPrimaryColor = textPrimaryColor,
+                            textSecondaryColor = textSecondaryColor,
+                            isDarkTheme = isDarkTheme
+                        )
+                        2 -> CareerContent(
+                            primaryColor = primaryColor,
+                            secondaryColor = secondaryColor,
+                            accentColor = accentColor,
+                            surfaceColor = surfaceColor,
+                            textPrimaryColor = textPrimaryColor,
+                            textSecondaryColor = textSecondaryColor,
+                            isDarkTheme = isDarkTheme
+                        )
+                        3 -> AwardsContent(
+                            primaryColor = primaryColor,
+                            secondaryColor = secondaryColor,
+                            accentColor = accentColor,
+                            surfaceColor = surfaceColor,
+                            textPrimaryColor = textPrimaryColor,
+                            textSecondaryColor = textSecondaryColor,
+                            isDarkTheme = isDarkTheme
+                        )
+                    }
                 }
             }
         }
@@ -347,7 +358,7 @@ fun ProfileHeader(
         AlertDialog(
             onDismissRequest = { showCoffeeDialog = false },
             title = { Text("Coffee Time!") },
-            text = { Text("You have promised to buy me coffee... you know what to do!") },
+            text = { Text("You have opted to buy me coffee... you know what to do!") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -375,7 +386,7 @@ fun ProfileHeader(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(240.dp)
+            .height(250.dp)
             .drawBehind {
                 // Background grid and dots pattern
                 val lineColor = Color.White.copy(alpha = 0.05f)
@@ -417,7 +428,7 @@ fun ProfileHeader(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(240.dp)
+                .height(250.dp)
                 .background(
                     brush = Brush.linearGradient(
                         colors = listOf(primaryColor, secondaryColor)
@@ -435,9 +446,7 @@ fun ProfileHeader(
                 .fillMaxWidth()
                 .padding(top = 4.dp)
         ) {
-            Spacer(modifier = Modifier.height(24.dp)) // This will push everything below it
-
-            // Profile image with triple tap detection
+            Spacer(modifier = Modifier.height(24.dp))
             Box(
                 modifier = Modifier
                     .size(120.dp)
@@ -449,16 +458,11 @@ fun ProfileHeader(
                         val currentTime = System.currentTimeMillis()
                         if (currentTime - lastTapTime < 500) {
                             tapCount++
-
-                            // Check for triple tap
                             if (tapCount == 3) {
-                                // Show the coffee dialog instead of launching directly
                                 showCoffeeDialog = true
-                                // Reset after successful trigger
                                 tapCount = 0
                             }
                         } else {
-                            // First tap or tap after timeout
                             tapCount = 1
                         }
                         lastTapTime = currentTime
@@ -550,6 +554,7 @@ fun ProfileHeader(
     }
 }
 
+
 // Function to launch Airtel Money or show fallback
 fun launchAirtelMoney(context: Context) {
     val airtelPackage = "com.airtel.africa.selfcare"
@@ -570,47 +575,7 @@ fun launchAirtelMoney(context: Context) {
         // Show fallback message
         Toast.makeText(
             context,
-            "Airtel Money app not installed. You can still buy me a coffee via USSD.",
-            Toast.LENGTH_LONG
-        ).show()
-
-        // Optional: Launch USSD code
-        try {
-            val ussdCode = "*115#"
-            val ussdIntent = Intent(Intent.ACTION_CALL)
-            ussdIntent.data = Uri.parse("tel:$ussdCode")
-            context.startActivity(ussdIntent)
-        } catch (e: Exception) {
-            // Handle exceptions (like missing CALL permission)
-            Toast.makeText(
-                context,
-                "Couldn't launch USSD code. Please dial *115# manually.",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
-}
-// Function to launch Airtel Money or show fallback
-fun launchAirtelMoney(context: Context) {
-    val airtelPackage = "com.airtel.africa.selfcare"
-    val isAirtelInstalled = try {
-        context.packageManager.getPackageInfo(airtelPackage, 0)
-        true
-    } catch (e: PackageManager.NameNotFoundException) {
-        false
-    }
-
-    if (isAirtelInstalled) {
-        // Launch Airtel Money app
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(airtelPackage)
-        if (launchIntent != null) {
-            context.startActivity(launchIntent)
-        }
-    } else {
-        // Show fallback message
-        Toast.makeText(
-            context,
-            "Airtel Money app not installed. You can still buy me a coffee via USSD.",
+            "Opps! Looks like the Airtel Money app is not installed. You can still buy me a coffee via USSD.",
             Toast.LENGTH_LONG
         ).show()
 
@@ -1346,11 +1311,13 @@ data class TabItem(
     val icon: ImageVector
 )
 
+
 @Preview(showBackground = true)
 @Composable
 fun ProfileScreenPreview() {
     AppEntryPoint()
 }
+
 @Composable
 fun AwardsContent(
     primaryColor: Color,
@@ -1385,7 +1352,6 @@ fun AwardsContent(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Award items in the requested order: 1, 4, 2, 3
                 AwardItem(
                     title = "Outstanding Male ICT Student",
                     organization = "ICT Association of Zambia",
@@ -1483,31 +1449,24 @@ fun AwardItem(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = textPrimaryColor
+            )
+
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = primaryColor.copy(alpha = 0.1f)
             ) {
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = textPrimaryColor
+                    text = year,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    color = primaryColor,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                 )
-
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = primaryColor.copy(alpha = 0.1f),
-                    modifier = Modifier
-                        .padding(start = 4.dp)
-                ) {
-                    Text(
-                        text = year,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
-                        color = primaryColor,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
             }
 
             Text(
@@ -1558,6 +1517,8 @@ fun AwardItem(
         }
     }
 }
+
+
 @Composable
 fun CareerContent(
     primaryColor: Color,
@@ -1597,7 +1558,7 @@ fun CareerContent(
                     degree = "Bachelor's Degree in ICT with Education",
                     institution = "Chalimbana University",
                     period = "2020 - 2024",
-                    status = "Pending Graduation",
+                    status = "Pending Grad.",
                     location = "Chongwe",
                     primaryColor = primaryColor,
                     textPrimaryColor = textPrimaryColor,
@@ -1774,7 +1735,12 @@ fun EducationItem(
                 )
 
                 Spacer(modifier = Modifier.width(12.dp))
+            }
 
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 Icon(
                     imageVector = Icons.Default.LocationOn,
                     contentDescription = null,
@@ -1880,7 +1846,12 @@ fun ExperienceItem(
                 )
 
                 Spacer(modifier = Modifier.width(12.dp))
+            }
 
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 Icon(
                     imageVector = Icons.Default.LocationOn,
                     contentDescription = null,
@@ -1897,7 +1868,6 @@ fun ExperienceItem(
         }
     }
 }
-
 
 @Composable
 fun SkillsContent(
