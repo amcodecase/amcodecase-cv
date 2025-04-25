@@ -74,8 +74,8 @@ Instead of a static document, this app allows me to present my profile in a **li
 
 Feel free to reach out or connect via the app’s embedded links — or contact me directly:
 
-- 📧 Email: `michelo.justus.dev@gmail.com`  
-- 🔗 LinkedIn: [linkedin.com/in/yourprofile](https://linkedin.com/in/amcodecase)  
+- 📧 Email: `michelojustus@gmail.com`  
+- 🔗 LinkedIn: [linkedin.com/in/amcodecase](https://linkedin.com/in/amcodecase)  
 - 🧑‍💻 GitHub: [github.com/amcodecase](https://github.com/amcodecase)  
 
 ---
